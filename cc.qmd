@@ -1,0 +1,114 @@
+---
+title: "CC "
+author: "Tiffany Sun (tsun28@amherst.edu)"
+format: 
+  pdf:
+    toc: true
+date: "`r Sys.Date()`"
+editor: source
+knitr:
+  opts_chunk:
+    fig.align: center
+---
+
+```{r}
+#| label: packages
+#| echo: FALSE
+#| message: FALSE
+
+knitr::opts_chunk$set(   
+  message = FALSE)   
+
+library(tidyverse)
+library(vroom)
+library(tidygeocoder)
+library(maps)
+library(ggrepel)
+library(sf)
+
+my_sf <- read_sf("nyc-streets.geojson") |>
+  janitor::clean_names()
+
+```
+
+```{r}
+#| label: data
+data <- vroom("Motor_Vehicle_Collisions_-_Crashes_20260612.csv") |>
+    janitor::clean_names() 
+
+missing_coords <- data |>
+    select(c(longitude, latitude, on_street_name)) |>
+    filter(is.na(longitude) & is.na(latitude), !is.na(on_street_name)) |>
+    select(on_street_name)
+
+coords <- data |>
+  select(c(longitude, latitude)) |>
+  filter(!is.na(longitude), !is.na(latitude), latitude != 0, longitude != 0) |>
+  mutate(longitude = ifelse(longitude < -200, yes =longitude + 127.2832727, longitude))
+  
+```
+
+```{r}
+#| label: map
+
+ggplot(my_sf) +
+  geom_sf(fill = "white", color = "black", linewidth = 0.1) +
+  theme_void()
+
+data_sf <- st_as_sf(
+  coords,
+  coords = c("longitude", "latitude"),
+  crs = 4326
+) |>
+  st_make_valid()
+
+ data_sf <- st_transform(data_sf, st_crs(my_sf))
+
+  st_crs(data_sf)
+  st_crs(my_sf)
+
+  nearest_index <- st_nearest_feature(data_sf, my_sf)
+
+joined <- cbind(
+  data_sf,
+  my_sf[nearest_index, ]
+) 
+
+joined <- joined |>
+  select(geom) |>
+  rename(geom = geometry.1) 
+
+  ggplot(joined) +
+  geom_sf(aes(fill = joined), color = "black", linewidth = 0.1) +
+  theme_void()
+
+
+```
+
+
+```{r}
+#| label: handling missing data 
+lat_longs <- sample_addresses %>% 
+  geocode(addr,lat=latitude,long=longitude)
+
+n <- ceiling(nrow(locations) / 10000)
+
+ds <- split(locations, factor(sort(rank(row.names(locations))%%n)))
+
+ds <- lapply(ds, function(d) {
+  as.data.frame(d) |>
+    mutate(on_street_name = paste0(on_street_name, ", NY")) |>
+    geocode(
+      address = on_street_name,
+      method = "geocodio",
+      lat = "latitude",
+      long = "longitude"
+    )
+})
+
+d <- asds[1]
+
+d <- as.data.frame(ds[1]) |> mutate(on_street_name = paste0(on_street_name, ", NY")) |>
+    geocode("on_street_name", method = 'geocodio', lat = latitude, long = longitude)
+
+```
