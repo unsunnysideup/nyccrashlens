@@ -25,22 +25,26 @@ library(tidygeocoder)
 library(maps)
 library(ggrepel)
 library(sf)
+library(tictoc)
 
 my_sf <- read_sf("UHF42.geo.json") |>
   janitor::clean_names()
+
+census_records <- readRDS("census_records.rds")
 
 ```
 
 ```{r}
 #| label: data
+
 data <- vroom("Motor_Vehicle_Collisions_-_Crashes_20260612.csv") |>
-    janitor::clean_names() 
+    janitor::clean_names() |>
+    mutate(crash_date = as.Date(crash_date, format="%m/%d/%Y"),
+    longitude = ifelse(is.na(longitude), census_records$longitude[match(on_street_name, census_records$on_street_name)], longitude),
+    latitude = ifelse(is.na(latitude), census_records$latitude[match(on_street_name, census_records$on_street_name)], latitude))
 
-missing_coords <- data |>
-    select(c(longitude, latitude, on_street_name)) |>
-    filter(is.na(longitude) & is.na(latitude), !is.na(on_street_name)) |>
-    select(on_street_name)
-
+data$year <- year(data$crash_date)
+  
 coords <- data |>
   select(c(longitude, latitude, number_of_persons_injured, number_of_persons_killed)) |>
   filter(!is.na(longitude), !is.na(latitude), latitude != 0, longitude != 0) |>
@@ -62,15 +66,20 @@ data_sf <- st_as_sf(
 ) |>
   st_make_valid()
 
- data_sf <- st_transform(data_sf, st_crs(my_sf))
+my_sf <- my_sf |> st_make_valid()
+
+data_sf <- st_transform(data_sf, st_crs(my_sf))
 
   st_crs(data_sf)
   st_crs(my_sf)
 
+tic()
+counts <- lengths(st_intersects(my_sf , data_sf |> select(geometry)))
+toc()
 
-counts <- lengths(st_intersects(my_sf, data_sf))
-
+tic()
 joined <- st_intersection(my_sf, data_sf)
+toc()
 
 my_sf$n <- counts
 
@@ -126,37 +135,6 @@ my_sf |>
   )
 
   # Casualties
-
-```
-
-```{r}
-#| label: handling missing data 
-n <- ceiling(nrow(missing_coords) / 10000)
-
-ds <- split(missing_coords, factor(sort(rank(row.names(missing_coords))%%n)))
-
-census_records <- data.frame()
-
-ds <- lapply(ds, function(d) {
-  as.data.frame(d) |>
-    mutate(on_street_name = paste0(on_street_name, ", NY")) |>
-    geocode(
-      address = on_street_name,
-      method = "census",
-      lat = "latitude",
-      long = "longitude"
-    )
-})
-
- ds <- bind_rows(ds) |>
-  filter(is.na(latitude))
-
- census_records <- bind_rows(ds) |>
-  filter(!is.na(latitude)) 
-
-census_records$on_street_name <- census_records$on_street__name |> str_remove(", NY")
-  
-
 
 ```
 
