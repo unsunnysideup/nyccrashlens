@@ -24,11 +24,7 @@ data <- vroom("data/Motor_Vehicle_Collisions_-_Crashes_20260612.csv") |>
     select(-c(borough, on_street_name, cross_street_name, off_street_name, contributing_factor_vehicle_2, zip_code, contributing_factor_vehicle_3, contributing_factor_vehicle_4, contributing_factor_vehicle_5, vehicle_type_code_5)) |>
     filter(!is.na(longitude), !is.na(latitude), latitude != 0, longitude != 0) |>
     mutate(longitude = ifelse(longitude < -200, yes =longitude + 127.2832727, longitude)) |>
-    pivot_longer(
-    cols = starts_with("vehicle_type"), # Columns to pivot
-    names_to = "vehicle_type_code",     
-    values_to = "vehicle_type"     
-  )
+    select(-c(vehicle_type_code_1, vehicle_type_code_2, vehicle_type_code_3, vehicle_type_code_4))
 
 coords_data <- data |>
   select(c(longitude, latitude, collision_id))
@@ -64,7 +60,7 @@ merged_data <- merge(data, combined, by.x = "collision_id", by.y = "collision_id
   rename(longitude = longitude.y,
   latitude = latitude.y) |> 
   filter(borough != "N/A") |> 
-  select(-id, -vehicle_type, -vehicle_type_code) |>
+  select(-id) |>
     mutate(number_of_persons_killed = ifelse(is.na(number_of_persons_killed), 0, number_of_persons_killed),
     number_of_persons_injured = ifelse(is.na(number_of_persons_injured), 0, number_of_persons_injured),
     contributing_factor_vehicle_1 = ifelse(is.na(contributing_factor_vehicle_1), "Unspecified", contributing_factor_vehicle_1)) |>
