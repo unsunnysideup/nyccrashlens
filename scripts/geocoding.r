@@ -13,7 +13,7 @@ missing_coords <- data |>
     filter(is.na(longitude) & is.na(latitude), !is.na(on_street_name)) |>
     select(!c(latitude, longitude))
 
-#| label: handling missing data 
+# handling missing data by 
 n <- ceiling(nrow(missing_coords) / 10000)
 
 ds <- split(missing_coords, factor(sort(rank(row.names(missing_coords))%%n)))

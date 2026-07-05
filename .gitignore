@@ -1,0 +1,6 @@
+.DS_Store
+data/census_records.rds
+data/collisions_data.rds
+data/my_sf.rds
+data/UHF42.geo.json
+data/Motor_Vehicle_Collisions_-_Crashes_20260612.csv

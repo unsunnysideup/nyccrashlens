@@ -1,0 +1,128 @@
+---
+title: "CC "
+author: "Tiffany Sun (tsun28@amherst.edu)"
+format: 
+  pdf:
+    toc: true
+date: "`r Sys.Date()`"
+editor: source
+knitr:
+  opts_chunk:
+    fig.align: center
+---
+
+```{r}
+#| label: packages
+#| echo: FALSE
+#| message: FALSE
+
+knitr::opts_chunk$set(   
+  message = FALSE)   
+
+library(tidyverse)
+library(vroom)
+library(tidygeocoder)
+library(maps)
+library(ggrepel)
+library(sf)
+library(tictoc)
+library(janitor)
+
+```
+
+```{r}
+my_sf <- read_rds("data/my_sf.rds") 
+data <- read_rds("data/collisions_data.rds") 
+```
+
+```{r}
+# all chloropleth map of NYC collisions , slider of years
+ggplot(my_sf) +
+geom_sf(aes(fill = count)) +
+  theme_void()
+
+# Top ten neighborhoods with most vehicle collisions
+# slider of years 
+my_sf |>
+  mutate(my_sf, geoname = fct_reorder(geoname, count)) |>
+  arrange(desc(count)) |>
+  slice(1:10) |>
+  ggplot(
+    aes(geoname, count)
+  ) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top Ten Neighborhoods with Most Vehicle Collisions",
+    y = "Neighborhoods",
+    x = "Collisions"
+  )
+
+# Boroughs with most vehicle collisons
+# slider of years
+my_sf |>
+  filter(
+    borough != "N/A"
+  ) |>
+  group_by(borough) |>
+  summarize(
+    ct = sum(count)
+  ) |>
+  mutate(borough = fct_reorder(borough, ct)) |>
+  arrange(desc(ct)) |>
+  slice(1:10) |>
+  ggplot(
+    aes(borough, ct)
+  ) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Ranked Boroughs with Most Vehicles Collisions",
+    y = "Borough",
+    x = "Collisions"
+  )
+
+  # number of collisions across time
+  # dropdown: boroughs, geonames 
+  # slider of years
+  data |> group_by(crash_date) |>
+    summarize(count = n()) |> 
+    ggplot(aes(x=crash_date, y=count)) +
+    geom_line() + 
+    xlab("")
+
+#filter(between(crash_date, as.Date("2014-01-20"), as.Date("2014-01-27"))) 
+
+# injured
+data |> group_by(borough) |>
+    summarize(number_of_persons_injured = sum(number_of_persons_injured)) |>
+  mutate(borough = fct_reorder(borough, number_of_persons_injured)) |>
+  ggplot(aes(x = borough, y = number_of_persons_injured)) +
+  geom_col() +
+  coord_flip()
+
+# killed 
+data |> group_by(borough) |>
+  summarize(number_of_persons_killed = sum(number_of_persons_killed)) |>
+  mutate(borough = fct_reorder(borough, number_of_persons_killed)) |>
+  ggplot(aes(x = borough, y = number_of_persons_killed)) +
+  geom_col() +
+  coord_flip()
+
+# Reasons 
+data |> filter(contributing_factor_vehicle_1 != "Unspecified") |> group_by(contributing_factor_vehicle_1) |>
+  summarize(n = n()) |>
+  mutate(contributing_factor_vehicle_1 = fct_reorder(contributing_factor_vehicle_1, n)) |>
+  arrange(desc(n)) |>
+  slice(1:10) |> 
+  ggplot(aes(contributing_factor_vehicle_1, n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top Ten Reasons",
+    y = "Count",
+    x = "Contributing Reason"
+  )
+
+# 
+```
