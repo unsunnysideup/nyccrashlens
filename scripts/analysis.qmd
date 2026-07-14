@@ -27,6 +27,7 @@ library(ggrepel)
 library(sf)
 library(tictoc)
 library(janitor)
+library(leaflet)
 
 ```
 
@@ -38,9 +39,71 @@ data <- read_rds("data/collisions_data.rds")
 
 ```{r}
 # all chloropleth map of NYC collisions , slider of years
+
+# Define a color palette
+pal <- colorNumeric(
+  palette = "YlOrRd", 
+  domain = my_sf$deaths
+)
+
+# Create the map
+leaflet(my_sf) %>%
+  addTiles() %>%
+  addPolygons(
+    fillColor = ~pal(count),
+    fillOpacity = 0.8,
+    color = "white",
+    weight = 1,
+    popup = paste0("Region: ", my_sf$geoname, "<br>Value: ", my_sf$count)
+  )   
+
+
 ggplot(my_sf) +
 geom_sf(aes(fill = count)) +
   theme_void()
+
+s <-  data |> group_by(crash_date, geometry, geoname, borough) |>
+    summarize(count = n(),
+    deaths = sum(number_of_persons_killed),
+    injuries = sum(number_of_persons_injured),
+    .groups = "drop") |> 
+    group_by(geometry, geoname, borough) |>
+    summarize(count = sum(count),
+    deaths = sum(deaths),
+    injuries = sum(injuries), 
+    .groups = "drop") |> 
+    st_as_sf()
+  
+leaflet(s) |>
+    addTiles() |>
+    addPolygons(
+    fillColor = ~pal(deaths),
+    fillOpacity = 0.8,
+    color = "white",
+    weight = 1,
+    popup = ~paste0("Region: ", geoname, "<br>Value: ", deaths))
+
+  data |> group_by(crash_date, geometry) |>
+    summarize(pedestrians = sum(number_of_pedestrians_killed),
+              motorists = sum(number_of_motorist_killed),
+              cyclists = sum(number_of_cyclist_killed),
+              deaths = sum(number_of_persons_killed)) |>
+    group_by(geometry) |>
+    summarize(pedestrians = sum(pedestrians),
+    motorists = sum(motorists),
+    cyclists = sum(cyclists),
+    deaths = sum(deaths)) |>
+    pivot_longer(
+    cols = -c(geometry, deaths),
+    names_to = "category",
+    values_to = "casualties"
+  ) |>
+    st_as_sf() |>
+    ggplot() +
+    geom_sf(aes(fill = deaths)) +
+    theme_void()
+
+
 
 # Top ten neighborhoods with most vehicle collisions
 # slider of years 
