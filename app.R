@@ -11,17 +11,50 @@ library(plotly)
 library(shinyWidgets)
 library(DT)
 library(lubridate)
+library(arrow)
 
-my_sf <- read_rds("data/my_sf.rds") 
 data <- read_rds("data/collisions_data.rds") 
 
+# data for database
+database <- data |>
+      select(-c(location, geometry)) |>
+      filter(!str_detect(contributing_factor_vehicle_1, "\\d")) |>
+      mutate(
+        geoname = as.factor(geoname),
+        borough = as.factor(borough),
+        contributing_factor_vehicle_1 = as.factor(contributing_factor_vehicle_1)
+      ) |>
+      rename(contributing_factor = contributing_factor_vehicle_1) |>
+      select(collision_id, crash_date, crash_time, borough, geocode, geoname, longitude, latitude, contributing_factor, everything())
+
+# UI
+
 ui <- page_navbar(
+  theme = bs_theme(
+    bg = "#101010",
+    fg = "#FFF",
+    primary = "#000000",
+    secondary = "#ffef5fff",
+    success = "#95c297ff",
+    base_font = font_google("Inconsolata"),
+    code_font = font_collection("SFMono-Regular", "Consolas", "monospace"),
+    bootswatch = "cyborg",
+    font_scale = 1.2)
+    |> bs_add_rules("
+    .navbar { background-color: #000000ff !important; }
+    .navbar { padding-top: 15px; padding-bottom: 15px;}
+    .compare_card { background-color: white !important;}
+    #compare_sidebar { padding-top: 5px; padding-left: 15px; padding-right: 15px}
+    html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+    html, body { -ms-overflow-style: none; scrollbar-width: none; }
+    #attribution_link {color: #ffef5fff !important;}
+  "),
   nav_panel("Home",
   div(
     style = "position: flex; justify-content: center; align-items: center; height: 100vh;",
     leafletOutput("map", height = "100%"),
     absolutePanel(
-        top = "15%", right = "5%", width = "20%", height = "80%",
+        top = "15%", right = "5%", width = "20%", height = "90%",
         style = "background: rgba(0,0,0,0.6); color: white; padding: 15px; border-radius: 8px;",
         h3("City-View Explorer"),
         selectInput("metric", "Metric:", choices = c("Collisions" = "count", 
@@ -31,7 +64,7 @@ ui <- page_navbar(
         skin = "Square",
         color = "White"
         ),
-        sliderInput("date_range", NULL, min = min(data$crash_date), max = max(data$crash_date), 
+        sliderInput("map_date_range", NULL, min = min(data$crash_date), max = max(data$crash_date), 
                     value = c(min(data$crash_date), max(data$crash_date))
                   ),
         DTOutput("boroughtable", height = "60%"))
@@ -39,11 +72,12 @@ ui <- page_navbar(
   nav_panel("Compare", 
   layout_sidebar(
     sidebar = sidebar(
-      width = "30%",
+      id = "compare_sidebar",
+      width = "35%",
       bg = "black",
       fg = "white",
-      h3("Comparison Explorer"),
-      p("How does the road safety of an area where I live compare to others?"),
+      h3("Comparative Tool"),
+      p("Explore how your residing region differs from other regions of interests."),
       sliderInput("date_range", NULL, min = min(data$crash_date), max = max(data$crash_date), 
                   value = c(min(data$crash_date), max(data$crash_date))),
       selectInput("region_type", "Type of Region to Compare", choices = c("Borough" = "borough", "Neighborhood" = "geoname")),
@@ -52,23 +86,46 @@ ui <- page_navbar(
     layout_columns(
       col_widths = c(6, 6, 6, 6),
       card(
+        class = "compare_card",
         plotlyOutput("hourPlot")),
       card( 
+        class = "compare_card",
         plotlyOutput("timePlot")),
       card(
+        class = "compare_card",
         plotlyOutput("injuryChart")),
       card( 
+        class = "compare_card",
         plotlyOutput("fatalityChart")))
   )),
-  nav_panel("Data Finder"
+  nav_panel("Database",
+  div(
+    style = "background: black; color: #f0e15a; padding: 20px; text-align: center;",
+    h3("New York City Collisions Database"),
+    p("Data is available for export with filters applied.")
   ),
+  card(
+    DTOutput("database")
+  ),
+  div(
+    style = "display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;",
+    downloadButton("data_exporter", "Download for Export (.csv)"),
+    span("Data source: ", a("NYC Open Data - Motor Vehicle Collisions", 
+    href = "https://data.cityofnewyork.us/Public-Safety/Motor-Vehicle-Collisions-Crashes/h9gi-nx95",
+    target = "_blank",
+    id = "attribution_link"),
+)
+
+  )),
   title = "NYC Collisions"
 )
+
+# Server
 server <- function(input, output, session) {
   map_data <- reactive({
     data |> 
-    filter(crash_date >= input$date_range[1],
-           crash_date <= input$date_range[2]) |>
+    filter(crash_date >= input$map_date_range[1],
+           crash_date <= input$map_date_range[2]) |>
     group_by(crash_date, geometry, geoname, borough) |>
     summarize(count = n(),
     deaths = sum(number_of_persons_killed),
@@ -150,7 +207,10 @@ server <- function(input, output, session) {
       ) |>
       plot_ly(x = ~crash_hour, y = ~collisions, color = ~region, 
         type = 'scatter', mode = 'lines') |>
-      layout(title = 'Time Series Plot by Hour',legend=list(title=list(text='Region')))
+      layout(title = 'Time Series Plot by Hour',
+             legend=list(title=list(text='Region')),
+             xaxis = list(title = "Hour of Crash (24-Hr Period)"),
+             yaxis = list(title = "Collision Occurences"))
   })
   output$timePlot <- renderPlotly({
     timeData <- comparison_data()
@@ -161,7 +221,10 @@ server <- function(input, output, session) {
       summarize(collisions = n(), .groups = "drop") |>
       plot_ly(x = ~crash_date, y = ~collisions, color = ~region,
       type = 'scatter', mode = 'lines') |>
-      layout(title = "Time Series Plot by Date", legend=list(title=list(text='Region')))
+      layout(title = "Time Series Plot by Date", 
+      legend=list(title=list(text='Region')),
+      xaxis = list(title = "Date of Crash"),
+      yaxis = list(title = "Collision Occurrences"))
 
   })
   output$injuryChart <- renderPlotly({
@@ -176,7 +239,11 @@ server <- function(input, output, session) {
       .groups = "drop") |>
       pivot_longer(-region, names_to = "category", values_to = "injuries") |>
       plot_ly(x = ~category, y = ~injuries, color = ~region, type = "bar") |>
-      layout(title = "Injury Breakdown Bar Chart", barmode = "group", legend=list(title=list(text='Region')))
+      layout(title = "Injury Breakdown Bar Chart", 
+            barmode = "group", 
+            legend=list(title=list(text='Region')),
+            xaxis = list(title = "Category"),
+            yaxis = list(title = "Injuries"))
   })
   output$fatalityChart <- renderPlotly({
     fatalityData <- comparison_data() 
@@ -190,12 +257,38 @@ server <- function(input, output, session) {
       .groups = "drop") |>
       pivot_longer(-region, names_to = "category", values_to = "deaths") |>
       plot_ly(x = ~category, y = ~deaths, color = ~region, type = "bar") |>
-      layout(title = "Fatality Breakdown Bar Chart", barmode = "group", legend=list(title=list(text='Region')))
+      layout(title = "Fatality Breakdown Bar Chart", 
+            barmode = "group", 
+            legend=list(title=list(text='Region')), 
+            xaxis = list(title = "Category"),
+            yaxis = list(title = "Fatalities"))
+  })
+
+  
+  output$database <- renderDT ({
+    server = TRUE
+
+    datatable(database,
+    options = list(
+      page_length = 10,
+      searching = TRUE,
+      ordering = TRUE,
+      autoWidth = TRUE
+    ),
+    selection = 'multiple',
+    filter = 'top',
+    rownames = TRUE)
+  })
+  output$data_exporter <- downloadHandler(
+    filename = function() {
+      "nyc_collisions.csv"
+    },
+    content = function(file) {
+      filtered <- input$database_rows_all
+      write.csv(database[filtered, ], file, row.names = FALSE)
   })
 
 
-
-
-
 }
+
 shinyApp(ui, server)
