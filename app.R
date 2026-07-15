@@ -11,6 +11,7 @@ library(shinyWidgets)
 library(DT)
 library(lubridate)
 library(arrow)
+library(waiter)
 
 data <- read_parquet("data/collisions_data.parquet") 
 my_sf <- read_rds("data/my_sf.rds")
@@ -30,6 +31,10 @@ database <- data |>
 # UI
 
 ui <- page_navbar(
+  header = tagList(
+    useWaiter(),
+    waiterOnBusy(html = spin_folding_cube(), color = "#000000")
+  ),
   theme = bs_theme(
     bg = "#101010",
     fg = "#FFF",
@@ -122,7 +127,9 @@ ui <- page_navbar(
 
 # Server
 server <- function(input, output, session) {
+  w <- Waiter$new(id = c("map"))
   map_data <- reactive({
+    w$show()
     counts <- data |> 
     filter(crash_date >= input$map_date_range[1],
            crash_date <= input$map_date_range[2]) |>
@@ -335,7 +342,6 @@ server <- function(input, output, session) {
       filtered <- input$database_rows_all
       write.csv(database[filtered, ], file, row.names = FALSE)
   })
-
 
 }
 
