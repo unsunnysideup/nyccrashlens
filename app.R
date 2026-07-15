@@ -203,11 +203,9 @@ server <- function(input, output, session) {
     data = heatmap_data,
     lng = ~longitude,
     lat = ~latitude,
-    intensity = ~value,
     blur = 1,
-    radius = 15,
-    minOpacity = 0.35,
-    max = max(heatmap_data$value),
+    radius = 5,
+    minOpacity = 0.50,
     gradient = "Blues",
     group = "Heatmap" # Name this group
   ) |>
