@@ -7,7 +7,8 @@ This is an interactive web application allowing exploration of various scales in
 - Which groups are more impacted by crashes and how do they differ across space and time?
 - What are common reported crash factors across city-view, borough-view, and neighborhood-view?
 
-Check out CrashLens NYC [here](https://txsu-n-nyccrashlens.share.connect.posit.cloud/)!
+Check out CrashLens NYC [here](https://txsu-n-nyccrashlens.share.connect.posit.cloud/)! 
+**Note**: Please use a desktop browser for best experience.
 
 ## Features
 CrashLens NYC has three main tools:
