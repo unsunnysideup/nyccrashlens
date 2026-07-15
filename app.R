@@ -11,7 +11,6 @@ library(shinyWidgets)
 library(DT)
 library(lubridate)
 library(arrow)
-library(leaflet.extras)
 
 data <- read_parquet("data/collisions_data.parquet") 
 my_sf <- read_rds("data/my_sf.rds")
@@ -157,7 +156,7 @@ server <- function(input, output, session) {
 
     metric <- input$metric
     leaflet_data$value <- leaflet_data[[metric]]
-    
+
     pal <- colorNumeric(
     palette = "YlOrRd", 
     domain = leaflet_data$value)
