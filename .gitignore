@@ -5,3 +5,4 @@ data/
 renv/activate.R
 *.json
 .Rprofile
+.posit/
