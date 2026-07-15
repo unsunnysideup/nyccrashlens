@@ -1,2 +1,2 @@
-# CrashLens NYC
-Check out CrashLens NYC [here](https://txsu-n-crashlens-nyc.share.connect.posit.cloud/)!
+# NYC CrashLens
+Check out NYC CrashLens [here](https://txsu-n-nyccrashlens.share.connect.posit.cloud/)!
