@@ -11,6 +11,7 @@ library(shinyWidgets)
 library(DT)
 library(lubridate)
 library(arrow)
+library(leaflet.extras)
 
 data <- read_parquet("data/collisions_data.parquet") 
 my_sf <- read_rds("data/my_sf.rds")
@@ -139,11 +140,35 @@ server <- function(input, output, session) {
     select(geoname, count, deaths, injuries) 
     
     left_join(my_sf, counts, by = "geoname")
-  })   
+  }) 
+  lnglat_data <- reactive({
+    data |>
+      filter(crash_date >= input$map_date_range[1],
+           crash_date <= input$map_date_range[2]) |>
+      group_by(longitude, latitude) |>
+      summarize(count = n(),
+      deaths = sum(number_of_persons_killed),
+      injuries = sum(number_of_persons_injured),
+      .groups = "drop")
+  })
+  reasons <- reactive({
+    data |> 
+      filter(crash_date >= input$map_date_range[1],
+      crash_date <= input$map_date_range[2], contributing_factor_vehicle_1 != "Unspecified") |>
+      group_by(geoname, contributing_factor_vehicle_1) |>
+      summarize(count = n(), .groups = "drop") |>
+      arrange(desc(count))
+  })
+
   output$map <- renderLeaflet({
+    heatmap_data <- lnglat_data()
     leaflet_data <- map_data()
+    factor_data <- reasons()
+
     metric <- input$metric
     leaflet_data$value <- leaflet_data[[metric]]
+    heatmap_data$value <- heatmap_data[[metric]]
+
     pal <- colorNumeric(
     palette = "YlOrRd", 
     domain = leaflet_data$value)
@@ -151,18 +176,48 @@ server <- function(input, output, session) {
     leaflet(leaflet_data, options = leafletOptions(minZoom = 10)) |>
     addTiles() |>
     addPolygons(
+    group = "Choropleth",
     fillColor = ~pal(value),
     fillOpacity = 0.8,
     color = "white",
     weight = 1,
-    popup = ~paste0("Borough: ", borough, "<br>Neighborhood: ", geoname, "<br>Value: ", value)) |>
+    popup = ~unname(mapply(function(b, g, v) {
+      top_reasons <- factor_data |>
+        filter(geoname == g) |>
+        slice(1:3) |>
+        pull(contributing_factor_vehicle_1)
+      paste0("<b>Borough</b>: ", b, 
+             "<br><b>Neighborhood</b>: ", g, 
+             "<br><b>Occurrences</b>: ", v,
+              "<br><b>Top Three Crash Factors</b>: ", paste(top_reasons, collapse = ", "))
+    }, borough, geoname, value, SIMPLIFY = TRUE))) |>
     setView( lng = -73.9570
            , lat = 40.708116
            , zoom = 11 ) |>
   setMaxBounds( lng1 = -75.9374
                 , lat1 = 39.3682
                 , lng2 = -71.7187
-                , lat2 = 42.0329 )
+                , lat2 = 42.0329 ) |>
+  # Heatmap
+  addHeatmap(
+    data = heatmap_data,
+    lng = ~longitude,
+    lat = ~latitude,
+    intensity = ~value,
+    blur = 1,
+    radius = 15,
+    minOpacity = 0.35,
+    max = max(heatmap_data$value),
+    gradient = "Blues",
+    group = "Heatmap" # Name this group
+  ) |>
+  # Layer Control
+  addLayersControl(
+    position = "topleft",
+    overlayGroups = c("Choropleth", "Heatmap"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+      hideGroup("Heatmap") 
 
   })
   output$boroughtable <- renderDT({
@@ -273,7 +328,7 @@ server <- function(input, output, session) {
 
     datatable(database,
     options = list(
-      page_length = 10,
+      page_length = 5,
       searching = TRUE,
       ordering = TRUE,
       autoWidth = TRUE
