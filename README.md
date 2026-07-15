@@ -8,6 +8,7 @@ This is an interactive web application allowing exploration of various scales in
 - What are common reported crash factors across city-view, borough-view, and neighborhood-view?
 
 Check out CrashLens NYC [here](https://txsu-n-nyccrashlens.share.connect.posit.cloud/)! 
+
 **Note**: Please use a desktop browser for best experience.
 
 ## Features
