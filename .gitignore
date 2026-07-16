@@ -8,3 +8,5 @@ renv/activate.R
 .posit/
 scripts/analysis.qmd
 outline.md
+writeup_outline.md
+project_outline.md
