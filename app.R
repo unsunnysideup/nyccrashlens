@@ -306,7 +306,7 @@ server <- function(input, output, session) {
       arrange(desc(Total)) |>
       datatable(
         options = list(dom = 't'),
-        caption = "Boroughs Ranked by Total Count"
+        caption = "Boroughs Ranked by Count"
       )
   })
 
