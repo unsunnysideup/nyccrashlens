@@ -7,16 +7,16 @@ library(tidygeocoder)
 
 # Data
 data <- vroom("Motor_Vehicle_Collisions_-_Crashes_20260612.csv") |>
-    janitor::clean_names() 
+  janitor::clean_names()
 
 missing_coords <- data |>
-    filter(is.na(longitude) & is.na(latitude), !is.na(on_street_name)) |>
-    select(!c(latitude, longitude))
+  filter(is.na(longitude) & is.na(latitude), !is.na(on_street_name)) |>
+  select(!c(latitude, longitude))
 
 # handling missing data by splitting up the dataset into subsets for accessible debugging purposes
 n <- ceiling(nrow(missing_coords) / 10000)
 
-ds <- split(missing_coords, factor(sort(rank(row.names(missing_coords))%%n)))
+ds <- split(missing_coords, factor(sort(rank(row.names(missing_coords)) %% n)))
 
 # creating dataset for recovered coordinates
 census_records <- data.frame()
@@ -35,19 +35,16 @@ ds <- lapply(ds, function(d) {
 })
 
 # joined all recovered coodinates to data
- census_records <- bind_rows(ds) |>
-  filter(!is.na(latitude)) 
+census_records <- bind_rows(ds) |>
+  filter(!is.na(latitude))
 
 # dataset of all unrecovered coordinates
- ds <- bind_rows(ds) |>
+ds <- bind_rows(ds) |>
   filter(is.na(latitude))
 
 # removed "NY" from street name
- census_records$on_street_name <- census_records$on_street_name |>
+census_records$on_street_name <- census_records$on_street_name |>
   str_remove(regex(", NY"))
 
 # saved data
- saveRDS(census_records, "census_records.rds")
-
-
-
+saveRDS(census_records, "census_records.rds")
